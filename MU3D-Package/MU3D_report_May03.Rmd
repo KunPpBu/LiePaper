@@ -1,0 +1,226 @@
+---
+title: "MU3D_report_May03"
+author: "Kun Bu"
+date: "5/3/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r}
+# input data
+MU3D_Video_Level_Data <- read.csv("MU3D_Video_Level_Data.csv")
+dim(MU3D_Video_Level_Data)
+head(MU3D_Video_Level_Data)
+str(MU3D_Video_Level_Data)
+```
+
+## Check Correlation among variables
+```{r}
+panel.hist <- function(x, ...) {
+    usr <- par("usr")
+    on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5))
+    his <- hist(x, plot = FALSE)
+    breaks <- his$breaks
+    nB <- length(breaks)
+    y <- his$counts
+    y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = rgb(0, 1, 1, alpha = 0.5), ...)
+    lines(density(x), col = 2, lwd = 2) 
+}
+
+# Creating the scatter plot matrix
+pairs(MU3D_Video_Level_Data[,9:13],
+      upper.panel = NULL,         
+      diag.panel = panel.hist) 
+```
+```{r}
+
+
+```
+
+
+
+
+## Principal Component Analysis
+An alternative way to deal with the multicolinearlity is to apply the principal component analysis. Note that in PCA we specify scale = TRUE so that each of the variables in the dataset are scaled to have a mean of 0 and a standard deviation of 1 before calculating the principal components. Also note that eigenvectors in R point in the negative direction by default, so we’ll multiply by -1 to reverse the signs. Here is the procedures: 
+```{r}
+#calculate principal components
+results <- prcomp(MU3D_Video_Level_Data[,9:13], scale = TRUE)
+
+#reverse the signs
+results$rotation <- -1*results$rotation
+
+#display principal components
+results$rotation
+
+
+
+```
+
+We can see that the first principal component (PC1) has high values for Trustworthy, TruthProp, and Attractive which indicates that this principal component describes the most variation in these variables. 
+ 
+ 
+We can also see that the second principal component (PC2) has a high value for Accuracy and Attractive, which indicates that this principle component places most of its emphasis on Accuracy and Attractive. where Accuracy Indicates average accuracy (i.e., proportion correct) across raters who viewed the video, and Attractive Indicates average attractiveness ratings (measured on a scale ranging from 1 "Not at all" to 7 "Extremely") across raters who viewed the video. 
+
+Note that the principal components scores for each state are stored in results$x. We will also multiply these scores by -1 to reverse the signs:
+
+```{r}
+#reverse the signs of the scores
+results$x <- -1*results$x
+
+#display the first six scores
+row.names(results$x) <- MU3D_Video_Level_Data$VideoID
+head(results$x)
+```
+
+Next, we can create a biplot – a plot that projects each of the observations in the dataset onto a scatterplot that uses the first and second principal components as the axes, Note that scale = 0 ensures that the arrows in the plot are scaled to represent the loadings.
+```{r}
+#library("devtools")
+#install_github("kassambara/factoextra")
+library(factoextra)
+fviz_pca_biplot(results)
+```
+
+From the plot we can see each of the 320 video records represented in a simple two-dimensional space. The video records that are close to each other on the plot have similar data patterns in regards to the variables in the original dataset.
+We can use the following code to calculate the total variance in the original dataset explained by each principal component:
+
+```{r}
+#calculate total variance explained by each principal component
+results$sdev^2 / sum(results$sdev^2)
+```
+
+
+
+
+## Support Vector Machine
+Since there is multicollinearity between the predictor variables accuracy and truthprop, we will drop them and first fit a SVM model to see how does the classification results. I will split the dataset as 80/20. Then the define a train- / test-split so that we have some data we can test our model on:
+```{r}
+smp_size_raw <- floor(0.80 * nrow(MU3D_Video_Level_Data))
+train_ind_raw <- sample(nrow(MU3D_Video_Level_Data), size = smp_size_raw)
+train_raw.df <- as.data.frame(MU3D_Video_Level_Data[train_ind_raw, -c(1,14)])
+test_raw.df <- as.data.frame(MU3D_Video_Level_Data[-train_ind_raw, -c(1,14)])
+#head(test_raw.df)
+#head(train_raw.df)
+```
+Now that our data is ready, we can use the svm() function in R to make our analysis 
+```{r}
+library(MASS)
+library(e1071)
+library(caret)
+levels <- unique(c(train_raw.df$Veracity, test_raw.df$Veracity))
+test_raw.df$Veracity  <- factor(test_raw.df$Veracity, levels=levels)
+train_raw.df$Veracity <- factor(train_raw.df$Veracity, levels=levels)
+svmfit = svm(Veracity ~ ., data = train_raw.df, kernel = "linear", cost = 10, scale = TRUE)
+
+pred.svm <- predict(svmfit, test_raw.df)
+pred.svm
+confusionMatrix(pred.svm, test_raw.df$Veracity, dnn = c("Prediction", "Reference"))
+
+library(PRROC)
+df <- as.data.frame(pred.svm)
+df$label <- as.numeric(test_raw.df$Veracity)
+df$pred.svm <- as.numeric(df$pred.svm)
+PRROC_obj <- roc.curve(scores.class0 = df$pred.svm, weights.class0=df$label,
+                       curve=TRUE)
+plot(PRROC_obj)
+
+library(ROCit)
+
+ROCit_obj <- rocit(score=df$pred.svm,class=df$label)
+plot(ROCit_obj)
+
+```
+
+
+## k-Nearest Neighbor
+I split the dataset as 90/10. Then the define a train- / test-split so that we have some data we can test our model on:
+```{r}
+library(class)
+smp_size_raw <- floor(0.90 * nrow(MU3D_Video_Level_Data))
+train_ind_raw <- sample(nrow(MU3D_Video_Level_Data), size = smp_size_raw)
+train_raw.df <- as.data.frame(MU3D_Video_Level_Data[train_ind_raw, -c(1,14)])
+test_raw.df <- as.data.frame(MU3D_Video_Level_Data[-train_ind_raw, -c(1,14)])
+
+target_category <- train_raw.df$Veracity
+test_category <- test_raw.df$Veracity
+k=sqrt(dim(MU3D_Video_Level_Data)[1])
+##run knn function
+pr <- knn(train_raw.df,test_raw.df,cl=target_category,k=k)
+ 
+##create confusion matrix
+tab <- table(pr,test_category)
+ 
+##this function divides the correct predictions by total number of predictions that tell us how accurate teh model is.
+ 
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x)))) * 100}
+accuracy(tab)
+
+
+df$pred <- as.numeric(pr)
+df$label <- as.numeric(test_raw.df$Veracity)
+
+ROCit_obj <- rocit(score=df$pred,class=df$label)
+plot(ROCit_obj)
+
+```
+
+
+
+## Binary Logistic Regression 
+
+```{r}
+library(mlbench)
+library(MASS)
+library(pROC)
+
+logit <- glm(Veracity~., family = binomial,data = train_raw.df)
+summary(logit)
+
+logit_2 <- stepAIC(logit)
+#summary(logit_2)
+logit$aic
+logit_2$aic
+
+train_raw.df$Predict <- ifelse(logit_2$fitted.values >0.5,"pos","neg")
+
+
+
+# Confusion Matrix
+mytable <- table(train_raw.df$Veracity,train_raw.df$Predict)
+rownames(mytable) <- c("Obs. neg","Obs. pos")
+colnames(mytable) <- c("Pred. neg","Pred. pos")
+mytable
+
+# accuracy
+accuracy<- sum(diag(mytable))/sum(mytable)
+accuracy
+
+df$pred.blr <- ifelse(logit_2$fitted.values >0.5,"1","0")
+
+
+```
+
+
+
+## Summary
+
+
+Algorithms | Accuracy 
+-----------|------------
+SVM        |78.12%
+-----------|------------
+KNN        |65.63%
+-----------|------------
+BLR        |71.88%
+-----------|------------
+
+
+
+```{r}
+library(PRROC)
+
+PRROC_obj <- roc.curve(scores.class0 = df$predictions, weights.class0=df$labels,
+                       curve=TRUE)
+plot(PRROC_obj)
+```

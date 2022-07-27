@@ -1,0 +1,101 @@
+---
+title: "Deception Detection for MU3D using Machine Learning Algorithms "
+author: "Kun Bu"
+date: '2022-06-06'
+output:
+  pdf_document: default
+  
+---
+
+# Abstract 
+The purpose of this project is to detect people lying using different machine learning algorithms via analyzing the micro-expressions when people speak, and to conclude which algorithm gives the best prediction. The dataset that we used to fit into the machine learning models is Miami University Deception Detection Database (MU3D).  MU3D is a free resource containing 320 videos of Black and White targets, female and male, telling truths and lies. We captures the images from the 320 videos and apply OpenCV and Dlib in Python to processes the images into numeric data. Compared with the original MU3D dataset, we fit both datasets into difference machine learning algorithms, and give conclusion for the accuracy of prediction. 
+
+# 1. Introduction 
+
+Traditional lie detection machine is a polygraph, which can provide people with an averaging accuracy between 58% to 90%. With 90% accuracy, it seems to do a very good job on detecting lying, however, with 58% accuray, we can hardly have much confidence to say this person is lying. In other words, the polygraph test is easy to pass for those well-trained people (ie. company spies or country spies).  Even ordinary people who search for the word “polygraph” online, the next searching suggestion would be “How to Pass a Polygraph Test?”  Since the polygraph operating principle is to detect lies by looking for signs of an examinee's physiological changes. Once the examinee lies, it puts a blip on the polygraph machine that serves as a signature of that examinee’s lies. Besides, polygraph test is a time-based test that only captures the examinee’s body reaction in each specific question, which means the examinees themselves know that they’re being tested whether they are lying. Therefore, polygraphs are not useful for those underground and secret cases. 
+
+Therefore, facial recognition of micro-expressions comes to scientist’s minds. Why don’t we just detect lying by analyzing people’s facial micro expressions? According to the researchers, they found that the face will betray the deceiver’s true emotion - “cracking” briefly and allowing displays of true emotion to leak out. In addition, depending on the micro-expression exprets, even well-trained people can not control their micro-expression, most people can not even feel the changes on their own micro-expression. Thus, in this project, we will establish a way to detect lies through analyzing people’s micro-expression. 
+
+In the procedure of image processing, we applied OpenCV and Dlib library in python to detect human facial landmarks, print and save as coordinates into excel worksheet. The specific procedures are first select one image as input, we save the image path into python; then open the computer terminal window, type in the python code file names with the path of the image we would like to recognize, follow with shape predictor, the 68 facial landmarks, then let the computer runs. It would come with a window showing the detected facial landmarks at the input image. At this time, we should check the output window and make sure the human facial was detected correct and clearly, then hit enter let python to print the output facial landmarks coordinates (x,y). The last step we have to do is copy and paste the output, which was shown as column vector, into excel worksheet, where we should paste special as paste transpose to make our data as row vector and separate the x and y value in each coordinate. For a better understanding and easy coding style, we added a last column with header name “detection” as our label column, and entered 0 and 1 to represent “lying” and “ Truth”,  respectively. The overview of the data processing procedures are shown in the flowchart below: 
+
+```{r pressure, echo=FALSE, fig.cap="Step-by step procedures of image/data processing ",out.width = '100%'}
+knitr::include_graphics("/Users/amanda/Google Drive/School/USF/PhD/Major_Research/Lie_detection/MU3D-Package/Lie_drawio.png")
+```
+
+```{r , echo=FALSE, fig.cap="Face recognition input/output images ",out.width = '100%'}
+knitr::include_graphics("/Users/amanda/Google Drive/School/USF/PhD/Major_Research/Lie_detection/MU3D-Package/lielankmarks.png")
+```
+# 2. Related Work
+Previous work on deception detection has focused on a combination of different factors including verbal and non-verbal aspects. Text / audio only approaches alone using RNN or LSTM architecture were able to achieve only moderate amount of accuracy 76% - 84% [1]. Micro-expression only approaches achieved higher accuracy of 77% - 88% [1]. Wu et al. focused on “Deception Detection in Videos” concluded that micro- expression was the best performing approach among different methods they explored in detecting deception in videos [2]. Venkatesh et al published their work on CVIP 2019, which a group of researchers explored an visual-only approach by extracting visual features using CNN from video input and then feed them into an LSTM sequence learning model to output binary classification. We will further expand on previous work to focus exclusively on micro expressions and using the sequence of micro-expressions as the input for our deep learning model. 
+
+# 3. Method 
+
+Our next step is to fit our dataset into a machine learning model and see how the computer performs on detecting lies. We will do three different models, they are support vector machine, principal component analysis and linear discriminant analysis; I will start each algorithm with the definition and assumption, the reasons why I choose this model to use and the pros and cons of each algorithm. 
+Once we get the results from these modeling, we compare the predictive accuracy and give the conclusion. You may have a better understanding from the flowchart below: 
+
+
+```{r, echo=FALSE, fig.cap="A Flowchart of the Basic Ideas in Deception Detection",out.width = '100%'}
+knitr::include_graphics("/Users/amanda/Google Drive/School/USF/PhD/Major_Research/Lie_detection/MU3D-Package/lieflowchartdrawio.png")
+```
+
+## 3.1 Support Vector Machine (SVM)
+Support Vector Machines are based on a decision plane concept that defines decision boundaries. A decision plane is a separation plane between a set of objects with different types of membership. SVM is a supervised learning method used to perform binary classification on data. In our case, we have exactly two classes : Lies or Truth. Besides, SVM can deal with real valued features, which means there are no categorical variables in the data, such as our dataset above, all of the features are from the facial landmarks coordinates, they are all numerical numbers, which are much fittable by using SVM. What’s more, the SVM can perform well on a large number of features, for example, it works with ten, hundreds and thousands of features. In our dataset, we have a large number of features which motivates me to choose SVM. Another reason I would like to mention here is that SVM has simple decision boundaries, indicating that there are no issues with over fitting. 
+
+* The SVM can be defined as linear classifiers under the following two assumptions:
+  +  The distance from the SVM’s classification boundary to the nearest data point should be as large as possible;
+  +  The support vectors are the most useful data points because they are the ones most likely to be incorrectly classified.
+
+Thus, SVMs can be very efficient in predicting a data point’s class. In a dimension less than two, the boundary is linearly separable classes in the plane; and in more than two dimensions, the boundary is known as a hyper-plane. 
+
+## 3.2 Binary Logistic Regression (BLR)
+
+BLR is a statistical tool that classifies local node behavior to either malicious or benign. BLR has two stages: training and evaluation. At the training stage it uses node behavior from both benign and malicious node activity and derives a detection module. At the evaluation phase, data that was not used in the training stage, is used to evaluate the detection model. Regression analysis is a process that estimates the probability of the target variable given some linear combination of the predictors. Binary logistic regression (LR) is a regression model where the target variable is binary, that is, it can take only two values, 0 or 1. It is the most utilized regression model in readmission prediction, given that the output is modeled as readmitted (1) or not readmitted (0). BLR is a statistical tool that classifies local node behavior to either malicious or benign. BLR has two stages: training and evaluation. At the training stage it uses node behavior from both benign and malicious node activity and derives a detection module. At the evaluation phase, data that was not used in the training stage, is used to evaluate the detection model.  
+
+* Binary Logistic Regression has the following assumptions: 
+  + adequate sample size
+  + absence of multicollinearity
+  + no outliers
+  
+## 3.3 K-Nearest Neighbors (KNN)
+
+When KNN is used for classification, the output can be calculated as the class with the highest frequency from the K-most similar instances. Each instance in essence votes for their class and the class with the most votes is taken as the prediction. Class probabilities can be calculated as the normalized frequency of samples that belong to each class in the set of K most similar instances for a new data instance. For example, in a binary classification problem (class is 0 or 1): 
+
+$$p(class=0) = count(class=0) / (count(class=0)+count(class=1))$$
+KNN predictions are made for a new instance (x) by searching through the entire training set for the K most similar instances (the neighbors) and summarizing the output variable for those K instances. For regression this might be the mean output variable, in classification this might be the mode (or most common) class value. To determine which of the K instances in the training dataset are most similar to a new input a distance measure is used. For real-valued input variables, the most popular distance measure is Euclidean distance. 
+* Other popular distance measures include: 
+  + Hamming Distance: Calculate the distance between binary vectors. 
+  + Manhattan Distance: Calculate the distance between real vectors using the sum of their absolute difference.
+  + Minkowski Distance: Generalization of Euclidean and Manhattan distance. 
+
+Euclidean is a good distance measure to use if the input variables are similar in type (e.g. all measured widths and heights). Manhattan distance is a good measure to use if the input variables are not similar in type (such as age, gender, height, etc.).
+
+
+# 4. Results 
+In order to have a better view of results comparison, I put all of those three algorithms’ results into one table. Here we compare mainly in the prediction accuracy and false positive rate (known as a type I error). Here the false positive rate is interpreted as when the machine predicts lies while it is actually telling the truth. Since our goal is to detect the lies, we should not skip every possibility of lying. Once our machine indicates the people are lying, while they may be telling the truth; in real life, we still have the chance to do more investigation and prove if the machine is wrong an innocent person. But if we only focus on the false negative rate, which is known as a type II error. It means our prediction missed a lying person and misclassified, we don’t want to see this happen. 
+
+
+Algorithms | Accuracy   | Sensitivity| Specificity|
+-----------|------------|------------|------------|
+SVM        |78.12%      | 0.7179     | 0.8800     |
+-----------|------------|------------|------------|
+KNN        |65.63%      | 0.5000     | 0.5625     |
+-----------|------------|------------|------------|
+BLR        |71.88%      | 0.7037     | 0.7619     |
+-----------|------------|------------|------------|
+
+The AUC curve with optimal (Youden Index) point for SVM is: 
+
+```{r, echo=FALSE, fig.cap="AUC curve with optimal (Youden Index) point for SVM ",out.width = '70%'}
+knitr::include_graphics("/Users/amanda/Google Drive/School/USF/PhD/Major_Research/Lie_detection/MU3D-Package/SVM_AUC.png")
+```
+
+# 5. Conclusion
+
+Through analysis of all the data, calculations and graphs plotted, we are confident to say that SVM does a relatively better job on lie detection with the highest prediction accuracy 78.12% and the highest sensitivity and specificity. In summary, SVM does good since it deals with large numbers and real valued features; besides, our problem only has binary classes to work on, so It fits our dataset very well. In the future, I plan to do real time face recognition so that people can capture facial features in videos and collect more valuable data to be trained. Also, I aim to apply this method not only at lie detection, which is a binary-class, but also in a multi-class problem. Such as applying it to the baby camera, a monitor product that can detect a baby's needs. This is more complicated, since humans can hardly understand infants, nor the infants themselves know what they need, which brings difficulties on feature selection or it might turn out to be a different story of unsupervised learning. 
+
+
+
+# Defintion
+Face landmarking, defined as the detection and localization of certain keypoints points on the face, plays arguably the important role as an intermediary step for many subsequent face processing operations that ranges from biometric recognition to the understanding of mental states.
+
+
