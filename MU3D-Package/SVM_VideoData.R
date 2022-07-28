@@ -101,23 +101,22 @@ confusionMatrix(rad.test, test_raw.df$Veracity, dnn = c("Prediction", "Reference
 
 # feature extraction
 set.seed(3117)
-rfeCNTL <- rfeControl(functions = lrFuncs, method = "cv", number = 10)
-svm.features <- rfe(train_raw.df[,1:10], train_raw.df[,11],
-                    sizes = c(9, 8, 7, 6, 5),
+rfeCNTL <- rfeControl(functions = lrFuncs, method = "cv", number = 11)
+svm.features <- rfe(train_raw.df[,1:11], train_raw.df[,12],
+                    sizes = c(11, 10, 9, 8, 7, 6, 5),
                     rfeControl = rfeCNTL,
                     method = "svmLinear")
-
-svm.features$fit$coefficients #Accuracy      TruthProp     Attractive  VidLength_sec   VidLength_ms        Anxious    Trustworthy           Race  
+svm.features
+svm.features$fit$coefficients # Accuracy, TruthProp, VidLength_ms, VidLength_sec, Valence 
 
 
 
 # use above 8 features to train polynomial svm
 
 #SVM split train and test 80/20
-smp_size_raw <- floor(0.80 * nrow(MU3D_Video_Level_Data.scaled))
-train_ind_raw <- sample(nrow(MU3D_Video_Level_Data.scaled), size = smp_size_raw)
-train_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[train_ind_raw, c(1,3,4,5,7,8,9,10,11,12)])
-test_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[-train_ind_raw, c(1,3,4,5,7,8,9,10,11,12)])
+
+train_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[train_ind_raw, c(1,4,5,7,8,12)])
+test_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[-train_ind_raw, c(1,4,5,7,8,12)])
 levels <- unique(c(train_raw.df$Veracity, test_raw.df$Veracity))
 test_raw.df$Veracity  <- factor(test_raw.df$Veracity, levels=levels)
 train_raw.df$Veracity <- factor(train_raw.df$Veracity, levels=levels)
@@ -133,7 +132,7 @@ summary(poly.tune) #best degree is 4,coef0 = 4,  misclassification rate no large
 best.poly <- poly.tune$best.model
 poly.test <- predict(best.poly, newdata = test_raw.df)
 table(poly.test, test_raw.df$Veracity)
-confusionMatrix(poly.test, test_raw.df$Veracity, dnn = c("Prediction", "Reference")) # 92.19% accuracy, kappa = 0.84
+confusionMatrix(poly.test, test_raw.df$Veracity, dnn = c("Prediction", "Reference")) # 95.31% accuracy, kappa = 0.90
 
 
 
