@@ -120,8 +120,8 @@ test_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[-train_ind_raw, c(1,4,
 levels <- unique(c(train_raw.df$Veracity, test_raw.df$Veracity))
 test_raw.df$Veracity  <- factor(test_raw.df$Veracity, levels=levels)
 train_raw.df$Veracity <- factor(train_raw.df$Veracity, levels=levels)
-
-
+#write.csv(test_raw.df, "test_raw.df.csv")
+#write.csv(train_raw.df,"train_raw.df.csv")
 
 # tuning best svm model for polynomial kernel
 poly.tune <- tune.svm(Veracity ~ ., data = train_raw.df,
