@@ -39,6 +39,33 @@ ggplot(data = MU3D_Video_Level_Data.scaled.melt, aes(x=Veracity, y = value))+
 
 
 
+#################################
+# Correlation analysis - video
+#################################
+
+panel.hist <- function(x, ...) {
+  usr <- par("usr")
+  on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5))
+  his <- hist(x, plot = FALSE)
+  breaks <- his$breaks
+  nB <- length(breaks)
+  y <- his$counts
+  y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col = rgb(0, 1, 1, alpha = 0.5), ...)
+  lines(density(x), col = 2, lwd = 2) 
+}
+
+# Creating the scatter plot matrix- orginal
+pairs(MU3D_Video_Level_Data,
+      upper.panel = NULL,         
+      diag.panel = panel.hist) 
+
+# Creating the scatter plot matrix- scaled
+pairs(MU3D_Video_Level_Data.scaled,
+      upper.panel = NULL,         
+      diag.panel = panel.hist) 
+
 
 
 #SVM split train and test 80/20
@@ -135,4 +162,8 @@ table(poly.test, test_raw.df$Veracity)
 confusionMatrix(poly.test, test_raw.df$Veracity, dnn = c("Prediction", "Reference")) # 95.31% accuracy, kappa = 0.90
 
 
+
+pairs(train_raw.df,
+      upper.panel = NULL,         
+      diag.panel = panel.hist) 
 
