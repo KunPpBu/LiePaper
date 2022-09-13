@@ -46,6 +46,8 @@ train_raw.df$Veracity <- factor(train_raw.df$Veracity, levels=levels)
 rf.fit <- randomForest(Veracity~., data= MU3D_Video_Level_Data.scaled)
 rf.fit
 plot(rf.fit)
+which.min(rf.fit$err.rate[,1])
+
 
 mtry <- tuneRF(MU3D_Video_Level_Data.scaled[,-12],MU3D_Video_Level_Data.scaled$Veracity, ntreeTry=1000,
                stepFactor=1.5,improve=0.01, trace=TRUE, plot=TRUE)
@@ -55,7 +57,7 @@ print(best.m)
 
 
 set.seed(123)
-rf.fit1 <-randomForest(Veracity~.,data=train_raw.df, mtry=best.m, importance=TRUE,ntree=500)
+rf.fit1 <-randomForest(Veracity~.,data=train_raw.df, mtry=best.m, importance=TRUE,ntree=334)
 print(rf.fit1)
 #Evaluate variable importance
 importance(rf.fit1)
