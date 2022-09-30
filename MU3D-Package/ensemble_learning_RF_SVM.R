@@ -171,7 +171,7 @@ set.seed(100)
 
 control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
 
-algorithms_to_use <- c( 'glm', 'knn', 'svmPoly', 'gbm')
+algorithms_to_use <- c( 'glm', 'knn', 'svmPoly','svmLinear', 'wsrf',  'gbm')
 
 
 stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
