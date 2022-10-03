@@ -188,6 +188,33 @@ svmLinear_cm<- confusionMatrix(stacked_models$svmLinear$pred$pred, stacked_model
 wsrf_cm<- confusionMatrix(stacked_models$wsrf$pred$pred, stacked_models$wsrf$pred$obs)
 gbm_cm<- confusionMatrix(stacked_models$gbm$pred$pred, stacked_models$gbm$pred$obs)
 
+data <- data.frame(matrix(c(0.7109, 0.7422, 0.7969, 0.7953, 0.9578, 0.9734, 
+                            0.7344, 0.7562, 0.9938, 1.0000, 0.9625, 0.9812,
+                            0.6875, 0.7281, 0.6000, 0.5906, 0.9531, 0.9656, 
+                            0.4219, 0.4844, 0.5938, 0.5906, 0.9156, 0.9469),6,4))
+row <- c("RF+GLM", "RF+KNNs", "RF+SVM.Poly", "RF+SVM.Linear", "RF+WSRF", "RF+GBM")
+col <- c("Accuracy", "Sensitivity", "Specificity", "Kappa")
+colnames(data) <- col
+data$Method <- row
+rownames(data) <- c(1:6)
+data1<- data[,c(5,1,2,3,4)]
+
+#write.csv(data, "ensemble_result.csv")
+#plotting 
+library(ggplot2)
+
+# create a dataset
+specie <- c(rep("sorgho" , 3) , rep("poacee" , 3) , rep("banana" , 3) , rep("triticum" , 3) )
+condition <- rep(c("normal" , "stress" , "Nitrogen") , 4)
+value <- abs(rnorm(12 , 0 , 15))
+data1 <- data.frame(specie,condition,value)
+library(tidyr)
+data2 <- tidyr::gather(data1, key="Measurement", value="Value", 2:5)
+
+# Grouped
+ggplot(data2, aes(fill=Measurement, y=Value, x=reorder(Method, -Value))) + 
+  geom_bar(position="dodge", stat="identity")+
+  xlab("Method")
 
 # stack using rf
 stackControl <- trainControl(method="repeatedcv", number=5, repeats=3, savePredictions=TRUE, classProbs=TRUE)
