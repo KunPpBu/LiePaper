@@ -122,7 +122,7 @@ print(best.m)
 
 
 set.seed(123)
-rf.fit1 <-randomForest(Veracity~.,data=train_raw.df, mtry=best.m, importance=TRUE,ntree=334)
+rf.fit1 <-randomForest(Veracity~.,data=train_raw.df[,-3], mtry=best.m, importance=TRUE,ntree=334)
 print(rf.fit1)
 #Evaluate variable importance
 importance(rf.fit1)
@@ -178,7 +178,16 @@ stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.
 
 stacking_results <- resamples(stacked_models)
 
-summary(stacking_results)
+stacking_summary<- summary(stacking_results)
+save(stacking_summary, file = "stacking_summary.RData")
+
+glm_cm<- confusionMatrix(stacked_models$glm$pred$pred, stacked_models$glm$pred$obs)
+knn_cm<- confusionMatrix(stacked_models$knn$pred$pred, stacked_models$knn$pred$obs)
+svmPoly_cm<- confusionMatrix(stacked_models$svmPoly$pred$pred, stacked_models$svmPoly$pred$obs)
+svmLinear_cm<- confusionMatrix(stacked_models$svmLinear$pred$pred, stacked_models$svmLinear$pred$obs)
+wsrf_cm<- confusionMatrix(stacked_models$wsrf$pred$pred, stacked_models$wsrf$pred$obs)
+gbm_cm<- confusionMatrix(stacked_models$gbm$pred$pred, stacked_models$gbm$pred$obs)
+
 
 # stack using rf
 stackControl <- trainControl(method="repeatedcv", number=5, repeats=3, savePredictions=TRUE, classProbs=TRUE)
