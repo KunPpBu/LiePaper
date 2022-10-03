@@ -37,7 +37,14 @@ ggplot(data = MU3D_Video_Level_Data.scaled.melt, aes(x=Veracity, y = value))+
   geom_boxplot() + 
   facet_wrap(~variable, ncol=2)
 
-
+MU3D_Video_Level_Data1 <- MU3D_Video_Level_Data0
+MU3D_Video_Level_Data1$Veracity <- factor(MU3D_Video_Level_Data0$Veracity,levels = levels0)
+str(MU3D_Video_Level_Data1)
+dat <- data.frame(scale(MU3D_Video_Level_Data1[,-c(1,3,6,8,14)]))
+dat$Veracity <- factor(MU3D_Video_Level_Data0$Veracity,levels = levels0)
+ggplot(data = melt(dat, id.var = "Veracity"), aes(x=Veracity, y = value))+
+  geom_boxplot() + 
+  facet_wrap(~variable, ncol=2)
 
 #################################
 # Correlation analysis - video
