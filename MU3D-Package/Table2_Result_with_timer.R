@@ -113,7 +113,7 @@ print(difftime(tic, toc, units = "secs")[[1]])
 ####################
 install.packages("wsrf")
 library(wsrf)
-toc <- Sys.time()
+
 target <- "Veracity"
 ds <- MU3D_Video_Level_Data.scaled
 vars <- names(ds)
@@ -132,4 +132,177 @@ wdrf.fit <- predict(model.wsrf.1, newdata=test_raw.df, type="class")$class
 confusionMatrix(wdrf.fit, test_raw.df$Veracity, dnn = c("Prediction", "Reference"))
 tic <- Sys.time()
 print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+####################
+# GBM 
+####################
+install.packages("gbm")
+library(gbm)
+toc <- Sys.time()
+fit.gbm <- gbm(Veracity~. , data= train_raw.df, 
+               distribution = 'multinomial',
+               cv.folds = 10,
+               shrinkage = .01,
+               n.minobsinnode = 10,
+               n.trees = 200)
+
+pred <- predict.gbm(object = fit.gbm,
+                   newdata = test_raw.df,
+                   n.trees = 200,
+                   type = "response")
+
+##create confusion matrix
+pred.labels = colnames(pred)[apply(pred, 1, which.max)]
+result = data.frame(test_raw.df$Veracity, pred.labels)
+confusionMatrix(test_raw.df$Veracity, as.factor(pred.labels))
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+
+#################################
+# Ensemble Learning - video
+#################################
+library(caretEnsemble)
+set.seed(100)
+
+control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'glm', 'knn', 'svmPoly','svmLinear', 'wsrf',  'gbm')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+
+stacking_summary<- summary(stacking_results)
+#save(stacking_summary, file = "stacking_summary.RData")
+
+glm_cm<- confusionMatrix(stacked_models$glm$pred$pred, stacked_models$glm$pred$obs)
+knn_cm<- confusionMatrix(stacked_models$knn$pred$pred, stacked_models$knn$pred$obs)
+svmPoly_cm<- confusionMatrix(stacked_models$svmPoly$pred$pred, stacked_models$svmPoly$pred$obs)
+svmLinear_cm<- confusionMatrix(stacked_models$svmLinear$pred$pred, stacked_models$svmLinear$pred$obs)
+wsrf_cm<- confusionMatrix(stacked_models$wsrf$pred$pred, stacked_models$wsrf$pred$obs)
+gbm_cm<- confusionMatrix(stacked_models$gbm$pred$pred, stacked_models$gbm$pred$obs)
+
+
+
+#################################
+#RF+GLM - video
+#################################
+toc <- Sys.time()
+control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'rf','glm')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+stacking_summary<- summary(stacking_results)
+
+rfglm_cm<- confusionMatrix(stacked_models$glm$pred$pred, stacked_models$glm$pred$obs)
+rfglm_cm
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+#################################
+#RF+KNNs - video
+#################################
+toc <- Sys.time()
+control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'rf','knn')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+stacking_summary<- summary(stacking_results)
+
+rfknn_cm<- confusionMatrix(stacked_models$knn$pred$pred, stacked_models$knn$pred$obs)
+rfknn_cm
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+
+#################################
+#RF+svmPoly - video
+#################################
+toc <- Sys.time()
+control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'rf','svmPoly')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+stacking_summary<- summary(stacking_results)
+
+rfsvmPoly_cm<- confusionMatrix(stacked_models$svmPoly$pred$pred, stacked_models$svmPoly$pred$obs)
+rfsvmPoly_cm
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+#################################
+#RF+svmPoly - video
+#################################
+toc <- Sys.time()
+control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'rf','svmLinear')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+stacking_summary<- summary(stacking_results)
+
+rfsvmLinear_cm<- confusionMatrix(stacked_models$svmLinear$pred$pred, stacked_models$svmLinear$pred$obs)
+rfsvmLinear_cm
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+
+#################################
+#RF+wsrf - video
+#################################
+toc <- Sys.time()
+control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'rf','wsrf')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+stacking_summary<- summary(stacking_results)
+
+rfwsrf_cm<- confusionMatrix(stacked_models$wsrf$pred$pred, stacked_models$wsrf$pred$obs)
+rfwsrf_cm
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+
+
+#################################
+#RF+gbm - video
+#################################
+toc <- Sys.time()
+control_stacking <- trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'rf','gbm')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+stacking_summary<- summary(stacking_results)
+
+rfgbm_cm<- confusionMatrix(stacked_models$gbm$pred$pred, stacked_models$gbm$pred$obs)
+rfgbm_cm
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+
+
+#################################
+# ROC 
+#################################
+library(ROCR)
+
+
+
+
+
+
+
+
 
