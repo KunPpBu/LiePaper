@@ -1,0 +1,135 @@
+library(reshape2)
+library(factoextra)
+library(psych)
+library(corrplot)
+library(FactoMineR)
+library(devtools)
+install_github('sinhrks/ggfortify')
+library(ggfortify)
+library(e1071)
+library(caret)
+
+#import video level dataset
+MU3D_Video_Level_Data0 <- read.csv("MU3D_Video_Level_Data.csv")
+#import target level dataset
+MU3D_Target_Level_Data0 <- read.csv("MU3D_Target_Level_Data.csv")
+
+#remove veractiy first
+MU3D_Video_Level_Data <- MU3D_Video_Level_Data0[,-3]
+str(MU3D_Video_Level_Data)
+#scaled
+colnames(MU3D_Video_Level_Data)
+
+MU3D_Video_Level_Data.scaled <- data.frame(scale(MU3D_Video_Level_Data[,-c(1,13)]))
+
+#level veractiy
+levels0 <- unique(c(MU3D_Video_Level_Data0$Veracity, MU3D_Video_Level_Data0$Veracity))
+#add veracity back
+MU3D_Video_Level_Data.scaled$Veracity <- factor(MU3D_Video_Level_Data0$Veracity,levels = levels0)
+
+#SVM split train and test 80/20
+smp_size_raw <- floor(0.80 * nrow(MU3D_Video_Level_Data.scaled))
+train_ind_raw <- sample(nrow(MU3D_Video_Level_Data.scaled), size = smp_size_raw)
+train_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[train_ind_raw, ])
+test_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[-train_ind_raw, ])
+levels <- unique(c(train_raw.df$Veracity, test_raw.df$Veracity))
+test_raw.df$Veracity  <- factor(test_raw.df$Veracity, levels=levels)
+train_raw.df$Veracity <- factor(train_raw.df$Veracity, levels=levels)
+
+
+
+####################
+# SVM 
+####################
+# tuning best svm model for linear kernel
+linear.tune <- tune.svm(Veracity ~ ., data = train_raw.df,
+                        kernel = "linear",
+                        cost = c(0.001, 0.01, 0.1, 1, 5, 10))
+summary(linear.tune) #best cost is 1, misclassification rate no larger than 25%
+
+toc <- Sys.time()
+best.linear <- linear.tune$best.model
+linear.test <- predict(best.linear, newdata = test_raw.df)
+table(linear.test, test_raw.df$Veracity)
+confusionMatrix(linear.test, test_raw.df$Veracity, dnn = c("Prediction", "Reference")) 
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+####################
+# RF 
+####################
+#fit 2 
+toc <- Sys.time()
+rf.fit2 <-randomForest(Veracity~.,data=train_raw.df)
+print(rf.fit2)
+rf.pred2 <- predict(rf.fit2, test_raw.df)
+confusionMatrix(rf.pred2, test_raw.df$Veracity)
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+####################
+# KNN 
+####################
+library(class)
+toc <- Sys.time()
+
+target_category <- train_raw.df$Veracity
+test_category <- test_raw.df$Veracity
+k=sqrt(dim(MU3D_Video_Level_Data)[1])
+##run knn function
+knn.fit <- knn(train_raw.df,test_raw.df,cl=target_category,k=k)
+
+##create confusion matrix
+confusionMatrix(knn.fit, test_raw.df$Veracity, dnn = c("Prediction", "Reference")) 
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+
+####################
+# GLM 
+####################
+toc <- Sys.time()
+
+##run knn function
+glm.fit <- glm(Veracity~. ,family = binomial(link = "logit"), train_raw.df,)
+outcome <- predict(glm.fit, newdata = test_raw.df, type = 'response')
+outcome1 <- as.factor(ifelse(outcome > 0.5, 1, 0))
+##create confusion matrix
+confusionMatrix(data = outcome1, test_raw.df$Veracity, dnn = c("Prediction", "Reference"))
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
+
+
+
+####################
+# WSRF 
+####################
+install.packages("wsrf")
+library(wsrf)
+toc <- Sys.time()
+target <- "Veracity"
+ds <- MU3D_Video_Level_Data.scaled
+vars <- names(ds)
+
+if (sum(is.na(ds[vars]))) ds[vars] <- na.roughfix(ds[vars])
+ds[target] <- as.factor(ds[[target]])
+(tt <- table(ds[target]))
+form <- as.formula(paste(target, "~ ."))
+
+toc <- Sys.time()
+model.wsrf.1 <- wsrf(form, data=train_raw.df, parallel=FALSE)
+print(model.wsrf.1)
+wdrf.fit <- predict(model.wsrf.1, newdata=test_raw.df, type="class")$class
+
+##create confusion matrix
+confusionMatrix(wdrf.fit, test_raw.df$Veracity, dnn = c("Prediction", "Reference"))
+tic <- Sys.time()
+print(difftime(tic, toc, units = "secs")[[1]])
+
