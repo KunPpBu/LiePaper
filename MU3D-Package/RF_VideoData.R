@@ -57,7 +57,7 @@ print(best.m)
 
 
 set.seed(123)
-rf.fit1 <-randomForest(Veracity~.,data=train_raw.df, mtry=best.m, importance=TRUE,ntree=334)
+rf.fit1 <-randomForest(Veracity~.,data=train_raw.df, mtry=best.m, importance=TRUE,ntree=which.min(rf.fit$err.rate[,1]))
 print(rf.fit1)
 #Evaluate variable importance
 importance(rf.fit1)
@@ -70,16 +70,31 @@ library(ROCR)
 perf = prediction(pred1[,2], test_raw.df$Veracity)
 # 1. Area under curve
 auc = performance(perf, "auc")
-1-auc@y.values[[1]]
+auc@y.values[[1]]
 
 # 2. True Positive and Negative Rate
-pred3 = performance(perf, "fpr","tpr")
+pred3 = performance(perf, "tpr","fpr")
 # 3. Plot the ROC curve
 plot(pred3,main="ROC Curve for Random Forest",col=2,lwd=2)
 abline(a=0,b=1,lwd=2,lty=2,col="gray")
-legend("topleft", c(paste0("AUC = ", round(1-auc@y.values[[1]],4))))
+legend("topleft", c(paste0("AUC = ", round(auc@y.values[[1]],4))))
 
 
 rf.pred <- predict(rf.fit1, test_raw.df)
 confusionMatrix(rf.pred, test_raw.df$Veracity)
+
+
+
+
+
+
+#fit 2 
+rf.fit2 <-randomForest(Veracity~.,data=train_raw.df)
+print(rf.fit2)
+
+
+rf.pred2 <- predict(rf.fit2, test_raw.df)
+confusionMatrix(rf.pred2, test_raw.df$Veracity)
+
+
 
