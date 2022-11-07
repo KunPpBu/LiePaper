@@ -96,7 +96,7 @@ print(difftime(tic, toc, units = "secs")[[1]])
 ####################
 toc <- Sys.time()
 
-##run knn function
+##run glm function
 glm.fit <- glm(Veracity~. ,family = binomial(link = "logit"), train_raw.df,)
 outcome <- predict(glm.fit, newdata = test_raw.df, type = 'response')
 outcome1 <- as.factor(ifelse(outcome > 0.5, 1, 0))
