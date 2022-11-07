@@ -1,0 +1,387 @@
+---
+title: "Ensemble_Learning_MU3D"
+output:
+  html_document: default
+  pdf_document: default
+date: "2022-11-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## load packages
+
+
+```{r packages}
+library(reshape2)
+library(tidyverse)
+library(factoextra)
+library(psych)
+library(corrplot)
+library(FactoMineR)
+library(devtools)
+install_github('sinhrks/ggfortify',force = TRUE)
+library(ggfortify)
+library(e1071)
+library(caret)
+library(randomForest)
+```
+
+## import video level dataset
+
+
+```{r dataset, echo=FALSE}
+MU3D_Video_Level_Data0 <- read.csv("MU3D_Video_Level_Data.csv")
+```
+
+## Boxplot for variables
+
+```{r boxplot}
+#remove veractiy first
+MU3D_Video_Level_Data <- MU3D_Video_Level_Data0[,-grep("Veracity",colnames(MU3D_Video_Level_Data0))]
+str(MU3D_Video_Level_Data)
+#scaled
+colnames(MU3D_Video_Level_Data)
+
+MU3D_Video_Level_Data.scaled <- data.frame(scale(MU3D_Video_Level_Data[,-grep("VideoID|Transcription",colnames(MU3D_Video_Level_Data))]))
+
+#level veractiy
+levels0 <- unique(c(MU3D_Video_Level_Data0$Veracity, MU3D_Video_Level_Data0$Veracity))
+#add veracity back
+MU3D_Video_Level_Data.scaled$Veracity <- factor(MU3D_Video_Level_Data0$Veracity,levels = levels0)
+
+#melt data for boxplot
+MU3D_Video_Level_Data.scaled.melt <- melt(MU3D_Video_Level_Data.scaled, id.var = "Veracity")
+
+#plot boxplot
+ggplot(data = MU3D_Video_Level_Data.scaled.melt, aes(x=Veracity, y = value))+
+  geom_boxplot() + 
+  facet_wrap(~variable, ncol=4)
+
+
+```
+
+## Feature Selection
+
+```{r features}
+
+# ensure results are repeatable
+set.seed(7)
+# load the library
+library(mlbench)
+library(caret)
+
+# prepare training scheme
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+# train the model
+model <- train(Veracity~., data=MU3D_Video_Level_Data.scaled, method="lvq", preProcess="scale", trControl=control)
+# estimate variable importance
+importance <- varImp(model, scale=FALSE)
+# summarize importance
+print(importance)
+# plot importance
+plot(importance)
+
+features <- colnames(MU3D_Video_Level_Data.scaled[,importance$importance$X0>=0.51])
+
+```
+
+## Individual learning classifer
+
+Splitting data set into training and test datasets using 80/20 cretira. 
+
+```{r spliting}
+#split train and test 80/20
+set.seed(123)
+smp_size_raw <- floor(0.80 * nrow(MU3D_Video_Level_Data.scaled))
+train_ind_raw <- sample(nrow(MU3D_Video_Level_Data.scaled), size = smp_size_raw)
+train_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[train_ind_raw, importance$importance$X0>=0.51])
+test_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[-train_ind_raw, importance$importance$X0>=0.51])
+train_raw.df$Veracity <- MU3D_Video_Level_Data.scaled[train_ind_raw, 12]
+test_raw.df$Veracity <- MU3D_Video_Level_Data.scaled[-train_ind_raw, 12]
+```
+
+### SVM 
+```{r SVM}
+poly.tune <- tune.svm(Veracity ~ ., data = train_raw.df,
+                      kernel = "polynomial",
+                      degree = c(2, 3, 4, 5, 6),
+                      coef0 = c(0.1, 0.5, 1, 2, 3, 4))
+summary(poly.tune) #best degree is 4,coef0 = 2,  misclassification rate no larger than 12.87%
+best.poly <- poly.tune$best.model
+poly.test <- predict(best.poly, newdata = test_raw.df)
+table(poly.test, test_raw.df$Veracity)
+confusionMatrix(poly.test, test_raw.df$Veracity, dnn = c("Prediction", "Reference")) 
+
+```
+
+### Random Forest 
+```{r RF}
+
+
+set.seed(123)
+rf.fit <- randomForest(Veracity~., data= MU3D_Video_Level_Data.scaled)
+rf.fit
+plot(rf.fit)
+which.min(rf.fit$err.rate[,1])
+
+set.seed(123)
+mtry <- tuneRF(MU3D_Video_Level_Data.scaled[,-12],MU3D_Video_Level_Data.scaled$Veracity, ntreeTry=1000,
+               stepFactor=1.5,improve=0.01, trace=TRUE, plot=TRUE)
+best.m <- mtry[mtry[,2] == min(mtry[,2]), 1]
+print(mtry)
+print(best.m) 
+
+
+set.seed(123)
+rf.fit1 <-randomForest(Veracity~.,data=train_raw.df[,-3], mtry=best.m, importance=TRUE,ntree=334)
+print(rf.fit1)
+#Evaluate variable importance
+importance(rf.fit1)
+varImpPlot(rf.fit1)
+
+rf.pred <- predict(rf.fit1, test_raw.df)
+confusionMatrix(rf.pred, test_raw.df$Veracity)
+```
+
+#### plot AUC
+```{r rf auc}
+
+set.seed(123)
+pred1=predict(rf.fit1, test_raw.df, type = "prob")
+library(ROCR)
+perf = prediction(pred1[,1], test_raw.df$Veracity)
+# 1. Area under curve
+auc = performance(perf, "auc")
+auc@y.values[[1]]
+
+
+
+# 2. True Positive and Negative Rate
+pred3 = performance(perf, "tpr","fpr")
+# 3. Plot the ROC curve
+plot(pred3,main="ROC Curve for Random Forest",col=2,lwd=2)
+abline(a=0,b=1,lwd=2,lty=2,col="gray")
+legend("topleft", c(paste0("AUC = ", round(auc@y.values[[1]],4))))
+```
+
+## KNN
+
+```{r knn}
+library(class)
+
+target_category <- train_raw.df$Veracity
+test_category <- test_raw.df$Veracity
+k=sqrt(dim(MU3D_Video_Level_Data)[1])
+##run knn function
+knn.fit <- knn(train_raw.df,test_raw.df,cl=target_category,k=k)
+
+##create confusion matrix
+confusionMatrix(knn.fit, test_raw.df$Veracity, dnn = c("Prediction", "Reference")) 
+```
+
+
+## GLM
+
+```{r glm}
+
+##run glm function
+glm.fit <- glm(Veracity~. ,family = binomial(link = "logit"), train_raw.df,)
+outcome <- predict(glm.fit, newdata = test_raw.df, type = 'response')
+outcome1 <- as.factor(ifelse(outcome > 0.5, 1, 0))
+##create confusion matrix
+confusionMatrix(data = outcome1, test_raw.df$Veracity, dnn = c("Prediction", "Reference"))
+```
+
+## WSRF 
+
+```{r wsrf}
+#install.packages("wsrf")
+library(wsrf)
+
+target <- "Veracity"
+ds <- MU3D_Video_Level_Data.scaled
+vars <- names(ds)
+
+if (sum(is.na(ds[vars]))) ds[vars] <- na.roughfix(ds[vars])
+ds[target] <- as.factor(ds[[target]])
+(tt <- table(ds[target]))
+form <- as.formula(paste(target, "~ ."))
+
+model.wsrf.1 <- wsrf(form, data=train_raw.df, parallel=FALSE)
+print(model.wsrf.1)
+wdrf.fit <- predict(model.wsrf.1, newdata=test_raw.df, type="class")$class
+
+##create confusion matrix
+confusionMatrix(wdrf.fit, test_raw.df$Veracity, dnn = c("Prediction", "Reference"))
+```
+
+
+## GBM
+
+```{r gbm}
+#install.packages("gbm")
+library(gbm)
+
+fit.gbm <- gbm(Veracity~. , data= train_raw.df, 
+               distribution = 'multinomial',
+               cv.folds = 10,
+               shrinkage = .01,
+               n.minobsinnode = 10,
+               n.trees = 200)
+
+pred <- predict.gbm(object = fit.gbm,
+                   newdata = test_raw.df,
+                   n.trees = 200,
+                   type = "response")
+
+##create confusion matrix
+pred.labels = colnames(pred)[apply(pred, 1, which.max)]
+result = data.frame(test_raw.df$Veracity, pred.labels)
+caret::confusionMatrix(test_raw.df$Veracity, as.factor(pred.labels))
+```
+
+## Ensemble Learning
+```{r ensemble learning}
+library(caretEnsemble)
+set.seed(100)
+
+control_stacking <- caret::trainControl(method="repeatedcv", number=5, repeats=2, savePredictions=TRUE, classProbs=TRUE)
+algorithms_to_use <- c( 'glm', 'knn', 'svmPoly','svmLinear', 'wsrf',  'gbm')
+stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.scaled, trControl=control_stacking, methodList=algorithms_to_use)
+stacking_results <- resamples(stacked_models)
+
+stacking_summary<- summary(stacking_results)
+stacking_summary
+```
+
+
+## Plot results
+```{r plot}
+
+glm_cm<- confusionMatrix(stacked_models$glm$pred$pred, stacked_models$glm$pred$obs)
+knn_cm<- confusionMatrix(stacked_models$knn$pred$pred, stacked_models$knn$pred$obs)
+svmPoly_cm<- confusionMatrix(stacked_models$svmPoly$pred$pred, stacked_models$svmPoly$pred$obs)
+svmLinear_cm<- confusionMatrix(stacked_models$svmLinear$pred$pred, stacked_models$svmLinear$pred$obs)
+wsrf_cm<- confusionMatrix(stacked_models$wsrf$pred$pred, stacked_models$wsrf$pred$obs)
+gbm_cm<- confusionMatrix(stacked_models$gbm$pred$pred, stacked_models$gbm$pred$obs)
+
+data <- data.frame(matrix(c(0.7109, 0.7422, 0.7969, 0.7953, 0.9578, 0.9734, 
+                            0.7344, 0.7562, 0.9938, 1.0000, 0.9625, 0.9812,
+                            0.6875, 0.7281, 0.6000, 0.5906, 0.9531, 0.9656, 
+                            0.4219, 0.4844, 0.5938, 0.5906, 0.9156, 0.9469),6,4))
+row <- c("RF+GLM", "RF+KNNs", "RF+SVM.Poly", "RF+SVM.Linear", "RF+WSRF", "RF+GBM")
+col <- c("Accuracy", "Sensitivity", "Specificity", "Kappa")
+colnames(data) <- col
+data$Method <- row
+rownames(data) <- c(1:6)
+data1<- data[,c(5,1,2,3,4)]
+
+#write.csv(data, "ensemble_result.csv")
+#plotting 
+library(ggplot2)
+
+data2 <- tidyr::gather(data1, key="Measurement", value="Value", 2:5)
+
+# Grouped
+ggplot(data2, aes(fill=Measurement, y=Value, x=reorder(Method, -Value))) + 
+  geom_bar(position="dodge", stat="identity")+
+  xlab("Method")
+```
+
+
+# NLP in Transcription
+
+## document summarize
+```{r nlp}
+# write summerizer function
+library(textmineR)
+library(igraph)
+tcm <- CreateTcm(doc_vec = MU3D_Video_Level_Data$Transcription,
+                 skipgram_window = 10,
+                 verbose = FALSE,
+                 cpus = 2)
+
+# use LDA to get embeddings into probability space
+# This will take considerably longer as the TCM matrix has many more rows 
+# than a DTM
+embeddings <- FitLdaModel(dtm = tcm,
+                          k = 50,
+                          iterations = 200,
+                          burnin = 180,
+                          alpha = 0.1,
+                          beta = 0.05,
+                          optimize_alpha = TRUE,
+                          calc_likelihood = FALSE,
+                          calc_coherence = FALSE,
+                          calc_r2 = FALSE,
+                          cpus = 2)
+
+summarizer <- function(doc, gamma) {
+  
+  # recursive fanciness to handle multiple docs at once
+  if (length(doc) > 1 )
+    # use a try statement to catch any weirdness that may arise
+    return(sapply(doc, function(d) try(summarizer(d, gamma))))
+  
+  # parse it into sentences
+  sent <- stringi::stri_split_boundaries(doc, type = "sentence")[[ 1 ]]
+  
+  names(sent) <- seq_along(sent) # so we know index and order
+  
+  # embed the sentences in the model
+  e <- CreateDtm(sent, ngram_window = c(1,1), verbose = FALSE, cpus = 2)
+  
+  # remove any documents with 2 or fewer words
+  e <- e[ rowSums(e) > 2 , ]
+  
+  vocab <- intersect(colnames(e), colnames(gamma))
+  
+  e <- e / rowSums(e)
+  
+  e <- e[ , vocab ] %*% t(gamma[ , vocab ])
+  
+  e <- as.matrix(e)
+  
+  # get the pairwise distances between each embedded sentence
+  e_dist <- CalcHellingerDist(e)
+  
+  # turn into a similarity matrix
+  g <- (1 - e_dist) * 100
+  
+  # we don't need sentences connected to themselves
+  diag(g) <- 0
+  
+  # turn into a nearest-neighbor graph
+  g <- apply(g, 1, function(x){
+    x[ x < sort(x, decreasing = TRUE)[ 3 ] ] <- 0
+    x
+  })
+  
+  # by taking pointwise max, we'll make the matrix symmetric again
+  g <- pmax(g, t(g))
+  
+  g <- graph.adjacency(g, mode = "undirected", weighted = TRUE)
+  
+  # calculate eigenvector centrality
+  ev <- evcent(g)
+  
+  # format the result
+  result <- sent[ names(ev$vector)[ order(ev$vector, decreasing = TRUE)[ 1:3 ] ] ]
+  
+  result <- result[ order(as.numeric(names(result))) ]
+  
+  paste(result, collapse = " ")
+}
+
+```
+## Summarize text 
+
+```{r summarize}
+docs <- MU3D_Video_Level_Data$Transcription[1]
+sums <- summarizer(docs, gamma = embeddings$gamma)
+docs
+sums
+```
+
