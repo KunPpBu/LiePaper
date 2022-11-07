@@ -1,4 +1,5 @@
 library(reshape2)
+library(tidyverse)
 library(factoextra)
 library(psych)
 library(corrplot)
@@ -19,12 +20,12 @@ MU3D_Target_Level_Data0 <- read.csv("MU3D_Target_Level_Data.csv")
 # Boxplot for variables - video
 #################################
 #remove veractiy first
-MU3D_Video_Level_Data <- MU3D_Video_Level_Data0[,-3]
+MU3D_Video_Level_Data <- MU3D_Video_Level_Data0[,-grep("Veracity",colnames(MU3D_Video_Level_Data0))]
 str(MU3D_Video_Level_Data)
 #scaled
 colnames(MU3D_Video_Level_Data)
 
-MU3D_Video_Level_Data.scaled <- data.frame(scale(MU3D_Video_Level_Data[,-c(1,13)]))
+MU3D_Video_Level_Data.scaled <- data.frame(scale(MU3D_Video_Level_Data[,-grep("VideoID|Transcription",colnames(MU3D_Video_Level_Data))]))
 
 #level veractiy
 levels0 <- unique(c(MU3D_Video_Level_Data0$Veracity, MU3D_Video_Level_Data0$Veracity))
@@ -102,9 +103,7 @@ train_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[train_ind_raw, import
 test_raw.df <- as.data.frame(MU3D_Video_Level_Data.scaled[-train_ind_raw, importance$importance$X0>=0.51])
 train_raw.df$Veracity <- MU3D_Video_Level_Data.scaled[train_ind_raw, 12]
 test_raw.df$Veracity <- MU3D_Video_Level_Data.scaled[-train_ind_raw, 12]
-levels <- unique(c(train_raw.df$Veracity, test_raw.df$Veracity))
-test_raw.df$Veracity  <- factor(test_raw.df$Veracity, levels=levels)
-train_raw.df$Veracity <- factor(train_raw.df$Veracity, levels=levels)
+
 
 
 set.seed(123)
@@ -132,22 +131,24 @@ varImpPlot(rf.fit1)
 set.seed(123)
 pred1=predict(rf.fit1, test_raw.df, type = "prob")
 library(ROCR)
-perf = prediction(pred1[,2], test_raw.df$Veracity)
+perf = prediction(pred1[,1], test_raw.df$Veracity)
 # 1. Area under curve
 auc = performance(perf, "auc")
-1-auc@y.values[[1]]
+auc@y.values[[1]]
+
+
 
 # 2. True Positive and Negative Rate
-pred3 = performance(perf, "fpr","tpr")
+pred3 = performance(perf, "tpr","fpr")
 # 3. Plot the ROC curve
 plot(pred3,main="ROC Curve for Random Forest",col=2,lwd=2)
 abline(a=0,b=1,lwd=2,lty=2,col="gray")
-legend("topleft", c(paste0("AUC = ", round(1-auc@y.values[[1]],4))))
+legend("topleft", c(paste0("AUC = ", round(auc@y.values[[1]],4))))
 
 
 rf.pred <- predict(rf.fit1, test_raw.df)
 confusionMatrix(rf.pred, test_raw.df$Veracity)
-
+#0.7812
 
 #################################
 # SVM - video
@@ -178,7 +179,8 @@ stacked_models <- caretList(make.names(Veracity) ~., data=MU3D_Video_Level_Data.
 
 stacking_results <- resamples(stacked_models)
 
-stacking_summary<- summary(stacking_results)
+stacking_summary <- summary(stacking_results)
+
 save(stacking_summary, file = "stacking_summary.RData")
 
 glm_cm<- confusionMatrix(stacked_models$glm$pred$pred, stacked_models$glm$pred$obs)
