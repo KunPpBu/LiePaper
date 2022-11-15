@@ -1,0 +1,88 @@
+---
+title: "NLP project on MU3D"
+author: "Kun Bu"
+date: "2022-11-14"
+output: html_document
+---
+
+# Introduction
+This NLP project focus on the same data set MU3D, which has a column fracture called "Transcription". The Transcription contains the Full transcription of the video, which is a text record of the video for each volunteer. My goal in this NLP part is to calculate the text TF-IDF, which is Term Frequency-Inverse Document Frequency, to  define the importance of a keyword or phrase within a document. TF- IDF is  the product of two statistics, term frequency and inverse document frequency. where the equations are:
+
+\begin{align*}
+TF: \quad   tf(t,d) =  \frac{f_{(t,d)}}{\sum_{{t^{'} \in d}}f_{t^{'}, d}} \\
+\newline 
+IDF: \quad  idf(t, D) = \log\frac{N}{|\{d \in D: t \in d\}|}\\
+\newline
+TF-IDF: \quad tfidf(t, d, D) = tf(t,d) \cdot  idf(t, D)
+\end{align*}
+
+To interpret the value of TF-IDF, the higher the TF-IDF score the more important or relevant the term is; as a term gets less relevant, its TF-IDF score will approach 0. 
+
+Next, I will import the dataset and calculate the TF-IDF and interpret it step by step. 
+
+# Input Data
+
+```{r import data}
+library(dplyr)
+library(janeaustenr)
+library(tidytext)
+
+data <- read.csv("MU3D_Video_Level_Data.csv")
+```
+
+# Data cleaning 
+```{r data cleaning}
+data$Transcription <- gsub('[[:punct:] ]+',';',data$Transcription)
+data$Labels <- ifelse(grepl("T", data$VideoID)=="TRUE", "T", "L")
+data2 <- data %>% unnest_tokens(words,Transcription,token = stringr::str_split, pattern = ";") %>%
+  select(VideoID, words, Labels)
+
+```
+
+# Calculate TF-IDF
+```{r Tf}
+cluster_words <- data2 %>%
+  count(Labels,words,sort = TRUE)
+cluster_total_words <- cluster_words %>%
+  group_by(Labels) %>%
+  summarize(total=sum(n))
+cluster_words <- left_join(cluster_words,cluster_total_words)
+cluster_words <- cluster_words %>%
+  arrange(Labels)
+
+```
+
+```{r ggplot}
+
+library(ggplot2)
+
+ggplot(cluster_words, aes(n/total, fill = Labels)) +
+  geom_histogram(show.legend = FALSE,bins = 2) +
+  xlim(NA, 0.01) +
+  coord_cartesian(ylim=c(0,5000))
+
+```
+
+
+```{r tfidf}
+freq_by_rank <- cluster_words %>% 
+  group_by(Labels) %>% 
+  mutate(rank = row_number(), 
+         `term frequency` = n/total) %>%
+  ungroup()
+
+
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = Labels)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+
+cluster_tf_idf <- cluster_words %>%
+  bind_tf_idf(words, Labels, n)
+cluster_tf_idf
+```
+
+# Justisfication 
+
+As the above result shows the words, for example, "and", "I", "you" "to", "a", "the", etc, has a value of zero TF-IDF, which means those words are the least important in the transcription. In the later work, I can remove those words to avoid expensive computational time and increase the accuracy of machine learning classification. 
