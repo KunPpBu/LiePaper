@@ -72,7 +72,7 @@ print(difftime(tic, toc, units = "secs")[[1]])
 
 
 ####################
-# KNN 
+# KNN  
 ####################
 library(class)
 toc <- Sys.time()
