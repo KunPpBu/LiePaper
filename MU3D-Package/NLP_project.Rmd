@@ -86,3 +86,5 @@ cluster_tf_idf
 # Justisfication 
 
 As the above result shows the words, for example, "and", "I", "you" "to", "a", "the", etc, has a value of zero TF-IDF, which means those words are the least important in the transcription. In the later work, I can remove those words to avoid expensive computational time and increase the accuracy of machine learning classification. 
+
+```{r remove 0 tf-idf}
